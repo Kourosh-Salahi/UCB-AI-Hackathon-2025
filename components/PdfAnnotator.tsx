@@ -1,8 +1,9 @@
+
 import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from 'pdfjs-dist';
-import { Annotation, Point, StrokeAnnotation, TextAnnotation, Tool, LatexAnnotation, SelectionRectangle, RenderedLatexAnnotation } from '../src/types';
+import { Annotation, Point, StrokeAnnotation, TextAnnotation, Tool, RenderedLatexAnnotation, SelectionRectangle } from '../types';
 import { DEFAULT_PEN_COLOR, DEFAULT_PEN_LINE_WIDTH, ERASER_LINE_WIDTH, DEFAULT_TEXT_COLOR, DEFAULT_TEXT_FONT_SIZE_PDF_POINTS } from '../constants';
-import katex from 'katex';
+import { InlineMath } from 'react-katex';
 
 // Helper to generate unique IDs
 const generateId = (): string => Math.random().toString(36).substr(2, 9);
@@ -71,7 +72,7 @@ const PdfAnnotator = forwardRef<
   const [pageViewport, setPageViewport] = useState<PageViewport | null>(null);
   const [textInput, setTextInput] = useState<{ x: number, y: number, id: string, value: string } | null>(null); // For text tool input
 
-  const getCanvasCoordinates = (event: React.MouseEvent<HTMLCanvasElement>): Point => {
+  const getCanvasCoordinates = (event: React.PointerEvent<HTMLCanvasElement>): Point => {
     const canvas = annotationCanvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
@@ -100,14 +101,6 @@ const PdfAnnotator = forwardRef<
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Clear existing KaTeX containers before redrawing
-    const parent = annotationCanvasRef.current?.parentElement;
-    if (parent) {
-        const latexContainers = parent.querySelectorAll('div[id^="latex-container-"]');
-        latexContainers.forEach(container => container.remove());
-    }
-
-
     annotations.forEach(annotation => {
       ctx.beginPath();
       switch (annotation.type) {
@@ -129,8 +122,8 @@ const PdfAnnotator = forwardRef<
           const textAnn = annotation as TextAnnotation;
           if (textAnn.editing) break; // Don't draw if editing via HTML input
 
-          const { x: pdfX, y: pdfY } = textAnn;
-          const canvasPoint = getCanvasCoordinatesFromPdf({x: pdfX, y: pdfY});
+          const { x: pdfX, y: pdfY } = textAnn; // These are PDF user space coordinates (Y-up) for top-left
+          const canvasPoint = getCanvasCoordinatesFromPdf({x: pdfX, y: pdfY}); // canvasPoint.y is for the top line
           
           ctx.fillStyle = textAnn.color;
           // Font size in PDF points needs to be scaled by zoom for canvas rendering
@@ -142,41 +135,8 @@ const PdfAnnotator = forwardRef<
           });
           break;
         }
+        // LaTeX rendering is now handled by react-katex components in JSX
         case 'latex': {
-          const latexAnn = annotation as RenderedLatexAnnotation;
-          const containerId = `latex-container-${latexAnn.id}`; // Unique ID for container
-          let container = document.getElementById(containerId);
-          // Create container if it doesn't exist
-          if (!container && annotationCanvasRef.current?.parentElement) {
-            container = document.createElement('div');
-            container.id = containerId;
-            container.style.position = 'absolute';
-            container.style.pointerEvents = 'none'; // So it doesn't interfere with canvas events
-            container.style.zIndex = '15'; // Ensure it's above canvas but below text input
-            annotationCanvasRef.current.parentElement.appendChild(container);
-          }
-          
-          if (container) { // Ensure container exists before styling and rendering
-            const canvasPoint = getCanvasCoordinatesFromPdf({x: latexAnn.x, y: latexAnn.y});
-            const canvasRect = annotationCanvasRef.current?.getBoundingClientRect();
-
-            container.style.left = `${(canvasRect?.left || 0) + canvasPoint.x}px`;
-            container.style.top = `${(canvasRect?.top || 0) + canvasPoint.y}px`;
-            container.style.color = latexAnn.color;
-            
-            container.style.transform = `scale(${zoomLevel})`;
-            container.style.transformOrigin = 'top left';
-
-            try {
-              katex.render(latexAnn.latex, container, {
-                throwOnError: false,
-                displayMode: false, 
-              });
-            } catch (e) {
-              console.error("KaTeX rendering error:", e);
-              container.innerText = "Error rendering LaTeX";
-            }
-          }
           break;
         }
       }
@@ -244,16 +204,17 @@ const PdfAnnotator = forwardRef<
   }, [pdfDoc, currentPageNum, zoomLevel]); 
 
   useEffect(() => {
-    // This effect redraws annotations whenever they change, or when essential rendering params change.
+    // This effect redraws canvas-based annotations whenever they change, or when essential rendering params change.
+    // LaTeX annotations are handled by React's rendering based on the same state.
     drawAnnotations();
   }, [annotations, drawAnnotations, pageViewport]); // pageViewport ensures re-draw on zoom/page load.
 
   const [isLoadingPage, setIsLoadingPage] = useState(false);
 
 
-  const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvasPoint = getCanvasCoordinates(event);
-    const pdfPoint = getPdfPageCoordinates(canvasPoint);
+    const pdfPoint = getPdfPageCoordinates(canvasPoint); // pdfPoint is in PDF user space (Y-up)
 
     if (selectedTool === Tool.PEN) {
       setDrawingState(prev => ({ ...prev, isDrawing: true, currentPoints: [canvasPoint] }));
@@ -269,18 +230,22 @@ const PdfAnnotator = forwardRef<
       // Position textarea relative to canvas parent for correct scroll behavior
       const canvasWrapper = annotationCanvasRef.current?.parentElement;
       const parentRect = canvasWrapper?.getBoundingClientRect();
-      const inputX = canvasPoint.x + (annotationCanvasRef.current?.offsetLeft || 0) - (parentRect?.left || 0);
-      const inputY = canvasPoint.y + (annotationCanvasRef.current?.offsetTop || 0) - (parentRect?.top || 0);
+      
+      // canvasPoint.x and canvasPoint.y are already relative to the annotationCanvas.
+      // Since annotationCanvas is at (0,0) of its relative parent,
+      // canvasPoint.x and canvasPoint.y are the correct offsets for the textarea.
+      const inputX = canvasPoint.x;
+      const inputY = canvasPoint.y;
+
 
       setTextInput({ x: inputX, y: inputY, id: newTextId, value: '' });
-      const tempTextAnn: TextAnnotation = {
+      const tempTextAnn: TextAnnotation = { // Storing PDF user space coords (Y-up) for top-left
         id: newTextId,
         type: 'text',
-        x: pdfPoint.x,
+        x: pdfPoint.x, 
         y: pdfPoint.y,
         text: '',
         fontSize: DEFAULT_TEXT_FONT_SIZE_PDF_POINTS, 
-        size: DEFAULT_TEXT_FONT_SIZE_PDF_POINTS,
         color: textColor,
         editing: true,
       };
@@ -291,74 +256,102 @@ const PdfAnnotator = forwardRef<
       let foundAnnotationToMove: Annotation | null = null;
       let minDistance = Infinity;
 
+      // Iterate in reverse for hit-testing top-most annotations first
       for (const ann of [...annotations].reverse()) { 
-        const annCanvasPos = getCanvasCoordinatesFromPdf({x: (ann as any).x || 0, y: (ann as any).y || 0}); 
+        // For text/latex, ann.x, ann.y are PDF user space for top-left.
+        // For strokes, we check points.
         if (ann.type === 'text' || ann.type === 'latex') {
-            const textAnn = ann as TextAnnotation | RenderedLatexAnnotation;
-            const approxWidth = (textAnn.type === 'text' ? (textAnn as TextAnnotation).text.length * (textAnn as TextAnnotation).fontSize * 0.5 : 100) * zoomLevel; 
-            const approxHeight = (textAnn.type === 'text' ? (textAnn as TextAnnotation).fontSize : 50) * zoomLevel; 
-            if (canvasPoint.x >= annCanvasPos.x && canvasPoint.x <= annCanvasPos.x + approxWidth &&
-                canvasPoint.y >= annCanvasPos.y && canvasPoint.y <= annCanvasPos.y + approxHeight) {
+            const an = ann as TextAnnotation | RenderedLatexAnnotation;
+            const annCanvasOrigin = getCanvasCoordinatesFromPdf({x: an.x, y: an.y}); // Canvas Y for top of annotation
+
+            const approxCharWidth = (an.type === 'text' ? (an as TextAnnotation).fontSize * 0.6 : 20) * zoomLevel; 
+            const approxLineHeight = (an.type === 'text' ? (an as TextAnnotation).fontSize * 1.2 : 25) * zoomLevel;
+            
+            let textBlockWidth = 0;
+            let numLines = 1;
+            if (an.type === 'text') {
+                 numLines = (an as TextAnnotation).text.split('\n').length;
+                 const lines = (an as TextAnnotation).text.split('\n');
+                 lines.forEach(line => textBlockWidth = Math.max(textBlockWidth, line.length * approxCharWidth));
+            } else { 
+                // Approximate width for LaTeX: try to get it from rendered element or use a fallback
+                const latexElement = document.getElementById(`latex-container-${an.id}`);
+                textBlockWidth = latexElement ? latexElement.offsetWidth * zoomLevel : 100 * zoomLevel; // Account for zoom in hit test
+                 // Approximate height (can be complex for multi-line LaTeX)
+            }
+            const textBlockHeight = numLines * approxLineHeight;
+
+
+            if (canvasPoint.x >= annCanvasOrigin.x && canvasPoint.x <= annCanvasOrigin.x + textBlockWidth &&
+                canvasPoint.y >= annCanvasOrigin.y && canvasPoint.y <= annCanvasOrigin.y + textBlockHeight) {
                 foundAnnotationToMove = ann;
                 break;
             }
         } else if (ann.type === 'stroke') {
             const strokeAnn = ann as StrokeAnnotation;
-            for (const pt of strokeAnn.points) {
-                const strokeCanvasPt = getCanvasCoordinatesFromPdf(pt);
+            for (const pt of strokeAnn.points) { // pt is in PDF user space
+                const strokeCanvasPt = getCanvasCoordinatesFromPdf(pt); // Converted to canvas space
                 const dist = Math.sqrt(Math.pow(strokeCanvasPt.x - canvasPoint.x, 2) + Math.pow(strokeCanvasPt.y - canvasPoint.y, 2));
-                if (dist < (strokeAnn.lineWidth * zoomLevel / 2) + 5) { 
-                    if (dist < minDistance) {
+                const hitRadius = Math.max( (strokeAnn.lineWidth * zoomLevel / 2), 3) + 5; // +5 for easier clicking
+                if (dist < hitRadius) { 
+                    if (dist < minDistance) { 
                         minDistance = dist;
-                        foundAnnotationToMove = ann;
+                        foundAnnotationToMove = ann; 
                     }
                 }
             }
-            if (foundAnnotationToMove && foundAnnotationToMove.type === 'stroke') break; 
+            if (foundAnnotationToMove && foundAnnotationToMove.id === ann.id) break; 
         }
       }
 
       if (foundAnnotationToMove) {
-        const annCanvasPos = getCanvasCoordinatesFromPdf({x: (foundAnnotationToMove as any).x || 0, y: (foundAnnotationToMove as any).y || 0});
+        let annOriginCanvasPoint: Point;
+        if (foundAnnotationToMove.type === 'stroke') {
+            annOriginCanvasPoint = canvasPoint; 
+        } else { 
+            annOriginCanvasPoint = getCanvasCoordinatesFromPdf({ x: (foundAnnotationToMove as TextAnnotation | RenderedLatexAnnotation).x, y: (foundAnnotationToMove as TextAnnotation | RenderedLatexAnnotation).y });
+        }
+
         setDrawingState(prev => ({
           ...prev,
           isMoving: true,
           movingAnnotation: { 
             id: foundAnnotationToMove!.id, 
             type: foundAnnotationToMove!.type,
-            startOffset: (foundAnnotationToMove!.type === 'stroke') 
-              ? { x: 0, y: 0 } 
-              : { x: canvasPoint.x - annCanvasPos.x, y: canvasPoint.y - annCanvasPos.y }
+            startOffset: { 
+                x: canvasPoint.x - annOriginCanvasPoint.x, 
+                y: canvasPoint.y - annOriginCanvasPoint.y  
+            }
           },
-          currentPoints: [canvasPoint] // Store initial mouse point for stroke delta calculation
+          currentPoints: [canvasPoint] 
         }));
       }
     }
   };
 
-  const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (!drawingState.isDrawing && !drawingState.isSelecting && !drawingState.isMoving) return;
     const canvasPoint = getCanvasCoordinates(event);
 
     if (drawingState.isDrawing) {
       setDrawingState(prev => ({ ...prev, currentPoints: [...prev.currentPoints, canvasPoint] }));
       if (selectedTool === Tool.ERASER && pageViewport) {
-          const pdfEraserPoint = getPdfPageCoordinates(canvasPoint);
+          const pdfEraserPoint = getPdfPageCoordinates(canvasPoint); 
           const annotationsToRemove: string[] = [];
           annotations.forEach(ann => {
             if (ann.type === 'stroke') {
-              if (ann.points.some(p => {
+              if (ann.points.some(p => { 
                 const dist = Math.sqrt(Math.pow(p.x - pdfEraserPoint.x,2) + Math.pow(p.y - pdfEraserPoint.y,2));
-                const eraserRadiusPdf = (ERASER_LINE_WIDTH / 2) / pageViewport.scale;
+                const eraserRadiusPdf = (ERASER_LINE_WIDTH / 2) / pageViewport.scale; 
                 return dist < eraserRadiusPdf;
               })) {
                 annotationsToRemove.push(ann.id);
               }
             }
+            // Add logic for erasing text/latex if needed (e.g., if eraser center is within their bounds)
+            // For text/LaTeX, more complex bounding box check against pdfEraserPoint would be needed.
           });
           annotationsToRemove.forEach(id => onRemoveAnnotation(id));
-          // Visual erasing effect (destination-out) is complex to make permanent without path manipulation
-          // The above logic removes entire strokes if part of them is touched by eraser center.
       }
     } else if (drawingState.isSelecting && drawingState.selectionStartPoint) {
       const start = drawingState.selectionStartPoint;
@@ -371,39 +364,40 @@ const PdfAnnotator = forwardRef<
         if (!currentAnnotation) return;
 
         if (type === 'stroke') {
-            const prevMouseCanvasPoint = drawingState.currentPoints[drawingState.currentPoints.length-1];
+            const prevMouseCanvasPoint = drawingState.currentPoints[drawingState.currentPoints.length-1]; 
             const deltaCanvasX = canvasPoint.x - prevMouseCanvasPoint.x;
-            const deltaCanvasY = canvasPoint.y - prevMouseCanvasPoint.y;
+            const deltaCanvasY = canvasPoint.y - prevMouseCanvasPoint.y; 
             
             const deltaPdfX = deltaCanvasX / pageViewport.scale;
-            const deltaPdfY = deltaCanvasY / pageViewport.scale;
+            const deltaPdfY = deltaCanvasY / pageViewport.scale; 
 
             const updatedStroke = {
                 ...currentAnnotation as StrokeAnnotation,
                 points: (currentAnnotation as StrokeAnnotation).points.map(p => ({
                     x: p.x + deltaPdfX,
-                    y: p.y + deltaPdfY,
+                    y: p.y - deltaPdfY, 
                 })),
             };
             onUpdateAnnotation(updatedStroke);
-            setDrawingState(prev => ({...prev, currentPoints: [...prev.currentPoints, canvasPoint]})); 
+            setDrawingState(prev => ({...prev, currentPoints: [...prev.currentPoints.slice(0, -1), canvasPoint]})); 
 
         } else if (type === 'text' || type === 'latex') {
             const newCanvasX = canvasPoint.x - startOffset.x;
-            const newCanvasY = canvasPoint.y - startOffset.y;
-            const newPdfPoint = getPdfPageCoordinates({x: newCanvasX, y: newCanvasY});
+            const newCanvasY = canvasPoint.y - startOffset.y; 
+            
+            const newPdfPoint = getPdfPageCoordinates({x: newCanvasX, y: newCanvasY}); 
             
             const updatedAnn = {
                 ...currentAnnotation,
                 x: newPdfPoint.x,
-                y: newPdfPoint.y,
+                y: newPdfPoint.y, 
             };
             onUpdateAnnotation(updatedAnn as TextAnnotation | RenderedLatexAnnotation);
         }
     }
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = () => {
     if (drawingState.isDrawing && selectedTool === Tool.PEN) {
       if (drawingState.currentPoints.length > 1 && pageViewport) {
         const newStroke: StrokeAnnotation = {
@@ -430,9 +424,9 @@ const PdfAnnotator = forwardRef<
             
             const selectionBoxPageCoords: SelectionRectangle = {
                 x: topLeftPdf.x,
-                y: topLeftPdf.y, // PDF Y is from top, so this is fine
+                y: topLeftPdf.y, 
                 width: Math.abs(bottomRightPdf.x - topLeftPdf.x),
-                height: Math.abs(bottomRightPdf.y - topLeftPdf.y) 
+                height: Math.abs(topLeftPdf.y - bottomRightPdf.y) 
             };
             onSelectionForLatex(selectionBoxPageCoords);
         }
@@ -450,16 +444,16 @@ const PdfAnnotator = forwardRef<
     }));
   };
 
-  const handleMouseLeave = () => { 
+  const handlePointerLeave = () => { 
     if (drawingState.isDrawing || drawingState.isSelecting || drawingState.isMoving) {
-        handleMouseUp();
+        handlePointerUp();
     }
   };
 
   const handleTextSubmit = () => {
     if (textInput && drawingState.activeTextAnnotation) {
       const finalAnnotation: TextAnnotation = {
-        ...drawingState.activeTextAnnotation,
+        ...drawingState.activeTextAnnotation, 
         text: textInput.value,
         editing: false, 
       };
@@ -472,7 +466,6 @@ const PdfAnnotator = forwardRef<
   const handleTextInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (textInput) {
       setTextInput({ ...textInput, value: e.target.value });
-       // Dynamically adjust textarea height
       e.target.style.height = 'auto';
       e.target.style.height = `${e.target.scrollHeight}px`;
     }
@@ -495,6 +488,9 @@ const PdfAnnotator = forwardRef<
   useImperativeHandle(ref, () => ({
     getViewport: () => pageViewport,
     capturePageAsImage: async (): Promise<string | null> => {
+      // ... (existing implementation - Note: react-katex HTML elements won't be on this canvas image)
+      // This is a known limitation. For tutoring, the image context is PDF + canvas annotations.
+      // To include HTML overlays, html2canvas or similar would be needed.
       const pdfCanvas = pdfCanvasRef.current;
       const annCanvas = annotationCanvasRef.current;
       if (!pdfCanvas || !annCanvas || !pageViewport) return null;
@@ -508,45 +504,39 @@ const PdfAnnotator = forwardRef<
       tempCtx.drawImage(pdfCanvas, 0, 0);
       tempCtx.drawImage(annCanvas, 0, 0);
       
-      // KaTeX elements are HTML, not on canvas. For tutoring context, this means LaTeX won't be in the image.
-      // This is a limitation. html2canvas or similar would be needed for full fidelity.
-
       return tempCanvas.toDataURL('image/png');
     },
     captureSelectionAsImage: async (rectPageCoords: SelectionRectangle): Promise<string | null> => {
-        // This function will capture from both PDF and Annotation layers for better context
+        // ... (existing implementation - Note: react-katex HTML elements won't be on this canvas image)
         const pdfCanvas = pdfCanvasRef.current;
         const annCanvas = annotationCanvasRef.current;
         if (!pdfCanvas || !annCanvas || !pageViewport) return null;
 
         const topLeftCanvas = getCanvasCoordinatesFromPdf({x: rectPageCoords.x, y: rectPageCoords.y});
-        const widthCanvas = Math.abs(rectPageCoords.width * pageViewport.scale); // Ensure positive
-        const heightCanvas = Math.abs(rectPageCoords.height * pageViewport.scale); // Ensure positive
+        const bottomRightCanvas = getCanvasCoordinatesFromPdf({x: rectPageCoords.x + rectPageCoords.width, y: rectPageCoords.y - rectPageCoords.height});
         
-        // Adjust x,y if width/height were negative from PDF coords calculation
-        const finalCanvasX = rectPageCoords.width < 0 ? topLeftCanvas.x - widthCanvas : topLeftCanvas.x;
-        const finalCanvasY = rectPageCoords.height < 0 ? topLeftCanvas.y - heightCanvas : topLeftCanvas.y;
+        const canvasX = topLeftCanvas.x;
+        const canvasY = topLeftCanvas.y; 
+        const canvasWidth = Math.abs(bottomRightCanvas.x - topLeftCanvas.x);
+        const canvasHeight = Math.abs(bottomRightCanvas.y - topLeftCanvas.y); 
 
-
-        if (widthCanvas <=0 || heightCanvas <=0) return null;
+        if (canvasWidth <=0 || canvasHeight <=0) return null;
 
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = widthCanvas;
-        tempCanvas.height = heightCanvas;
+        tempCanvas.width = canvasWidth;
+        tempCanvas.height = canvasHeight;
         const tempCtx = tempCanvas.getContext('2d');
         if (!tempCtx) return null;
 
-        // Draw the selected portion of the PDF canvas (background)
         tempCtx.drawImage(
             pdfCanvas,
-            finalCanvasX, finalCanvasY, widthCanvas, heightCanvas, 
-            0, 0, widthCanvas, heightCanvas 
+            canvasX, canvasY, canvasWidth, canvasHeight, 
+            0, 0, canvasWidth, canvasHeight 
         );
-        // Draw the selected portion of the annotation canvas (foreground)
         tempCtx.drawImage(
             annCanvas,
-            finalCanvasX, finalCanvasY, widthCanvas, heightCanvas,
-            0, 0, widthCanvas, heightCanvas
+            canvasX, canvasY, canvasWidth, canvasHeight,
+            0, 0, canvasWidth, canvasHeight
         );
         
         return tempCanvas.toDataURL('image/png');
@@ -554,26 +544,26 @@ const PdfAnnotator = forwardRef<
   }));
 
   return (
-    <div className="relative shadow-lg w-full" style={{ 
-      userSelect: (selectedTool === Tool.TEXT || drawingState.activeTextAnnotation) ? 'auto' : 'none',
-      minHeight: '100%'
-    }}>
+    <div className="relative shadow-lg" style={{ userSelect: (selectedTool === Tool.TEXT || drawingState.activeTextAnnotation) ? 'auto' : 'none' }}>
       {isLoadingPage && <div className="absolute inset-0 bg-gray-500 bg-opacity-50 flex items-center justify-center z-20"><div className="text-white text-xl">Loading page...</div></div>}
-      <canvas ref={pdfCanvasRef} className="block border border-gray-500 max-w-none" />
+      <canvas ref={pdfCanvasRef} className="block border border-gray-500" />
       <canvas
         ref={annotationCanvasRef}
-        className="absolute top-0 left-0 border border-transparent z-10 max-w-none"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
-        style={{ cursor: selectedTool === Tool.PEN ? 'crosshair' : 
-                         selectedTool === Tool.ERASER ? 'grab' : 
-                         selectedTool === Tool.TEXT ? 'text' :
-                         selectedTool === Tool.LATEX_SELECT ? 'copy' :
-                         selectedTool === Tool.SELECT ? 'move' : 'default' }}
+        className="absolute top-0 left-0 border border-transparent z-10"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerLeave}
+        style={{ 
+            cursor: selectedTool === Tool.PEN ? 'crosshair' : 
+                    selectedTool === Tool.ERASER ? 'grab' : 
+                    selectedTool === Tool.TEXT ? 'text' :
+                    selectedTool === Tool.LATEX_SELECT ? 'copy' :
+                    selectedTool === Tool.SELECT ? 'move' : 'default',
+            touchAction: 'none' 
+        }}
       />
-      {textInput && pageViewport && (
+      {textInput && pageViewport && ( 
         <textarea
           autoFocus
           value={textInput.value}
@@ -581,17 +571,17 @@ const PdfAnnotator = forwardRef<
           onKeyDown={handleTextInputKeyDown}
           onBlur={handleTextSubmit} 
           style={{
-            position: 'absolute', // Relative to the PdfAnnotator's parent (main scroll area)
+            position: 'absolute', 
             left: `${textInput.x}px`,
             top: `${textInput.y}px`,
             fontSize: `${DEFAULT_TEXT_FONT_SIZE_PDF_POINTS * pageViewport.scale}px`, 
             lineHeight: `${DEFAULT_TEXT_FONT_SIZE_PDF_POINTS * pageViewport.scale * 1.2}px`,
             border: '1px dashed gray',
             background: 'rgba(255,255,255,0.95)',
-            color: textColor,
-            zIndex: 20, // Above annotation canvas
+            color: textColor, 
+            zIndex: 20, 
             minWidth: '100px', 
-            minHeight: `${DEFAULT_TEXT_FONT_SIZE_PDF_POINTS * pageViewport.scale * 1.2}px`,
+            minHeight: `${DEFAULT_TEXT_FONT_SIZE_PDF_POINTS * pageViewport.scale * 1.2}px`, 
             outline: 'none',
             overflow: 'hidden', 
             resize: 'none', 
@@ -601,6 +591,33 @@ const PdfAnnotator = forwardRef<
           rows={1} 
         />
       )}
+      {/* Render LaTeX annotations using react-katex */}
+      {pageViewport && annotations
+        .filter(ann => ann.type === 'latex')
+        .map(ann => {
+          const latexAnn = ann as RenderedLatexAnnotation;
+          // Calculate canvas coordinates for the top-left of the LaTeX annotation
+          const canvasPoint = getCanvasCoordinatesFromPdf({ x: latexAnn.x, y: latexAnn.y });
+          
+          return (
+            <div
+              key={latexAnn.id}
+              id={`latex-container-${latexAnn.id}`} // Useful for debugging
+              style={{
+                position: 'absolute',
+                pointerEvents: 'none', // Allow clicks to pass through to the canvas unless SELECT tool needs to interact
+                zIndex: 15, // Above canvas, below active text input
+                left: `${canvasPoint.x}px`, // Position relative to the parent (PdfAnnotator div)
+                top: `${canvasPoint.y}px`,  // Position relative to the parent
+                color: latexAnn.color,
+                transform: `scale(${zoomLevel})`,
+                transformOrigin: 'top left',
+              }}
+            >
+              <InlineMath math={latexAnn.latexString} />
+            </div>
+          );
+      })}
       <div className="print-only hidden">
           <h2>{pdfFileName} - Page {currentPageNum}</h2>
       </div>
