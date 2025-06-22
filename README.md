@@ -33,51 +33,62 @@ An intelligent PDF annotation application that allows you to markup PDFs with ha
    ```bash
    git clone https://github.com/yourusername/pdf-annotator-ai-tutor.git
    cd pdf-annotator-ai-tutor
+   ```
 
-Install dependencies
-bashnpm install
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-Set up environment variables
-bashcp .env.example .env
-Edit .env and add your Gemini API key:
-envGEMINI_API_KEY=your_actual_gemini_api_key_here
+3. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` and add your Gemini API key:
+   ```env
+   GEMINI_API_KEY=your_actual_gemini_api_key_here
+   ```
 
-Start the development server
-bashnpm run dev
+4. **Start the development server**
+   ```bash
+   npm run dev
+   ```
 
-Open your browser and navigate to http://localhost:5173
+5. **Open your browser** and navigate to `http://localhost:5173`
 
-🎯 How to Use
-Basic PDF Annotation
+## 🎯 How to Use
 
-Upload a PDF: Click "Upload PDF" button and select your file
-Choose a tool: Select from pen, text, eraser, or select/move tools
-Annotate: Draw, type, or markup your PDF as needed
-Navigate: Use page controls and zoom to navigate your document
+### Basic PDF Annotation
 
-AI Features
-Convert Handwriting to LaTeX
+1. **Upload a PDF**: Click "Upload PDF" button and select your file
+2. **Choose a tool**: Select from pen, text, eraser, or select/move tools
+3. **Annotate**: Draw, type, or markup your PDF as needed
+4. **Navigate**: Use page controls and zoom to navigate your document
 
-Select the LaTeX Select tool (📐 icon)
-Draw a rectangle around handwritten math
-The AI will automatically convert it to properly formatted LaTeX
+### AI Features
 
-Get AI Tutoring Hints
+#### Convert Handwriting to LaTeX
+1. Select the **LaTeX Select** tool (📐 icon)
+2. Draw a rectangle around handwritten math
+3. The AI will automatically convert it to properly formatted LaTeX
 
-Click the Get Hint button (💡 icon)
-Optionally provide a specific question
-The AI tutor will analyze your work and provide helpful guidance
+#### Get AI Tutoring Hints
+1. Click the **Get Hint** button (💡 icon)
+2. Optionally provide a specific question
+3. The AI tutor will analyze your work and provide helpful guidance
 
-🛠️ Technology Stack
+## 🛠️ Technology Stack
 
-Frontend: React 19, TypeScript, Tailwind CSS
-PDF Processing: PDF.js
-Math Rendering: KaTeX, react-katex
-AI Integration: Google Gemini AI
-Build Tool: Vite
-Styling: Tailwind CSS
+- **Frontend**: React 19, TypeScript, Tailwind CSS
+- **PDF Processing**: PDF.js
+- **Math Rendering**: KaTeX, react-katex
+- **AI Integration**: Google Gemini AI
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS
 
-📁 Project Structure
+## 📁 Project Structure
+
+```
 pdf-annotator-ai-tutor/
 ├── components/           # React components
 │   ├── FileUpload.tsx   # PDF file upload
@@ -92,77 +103,85 @@ pdf-annotator-ai-tutor/
 ├── constants.ts        # Application constants
 ├── index.tsx          # Application entry point
 └── index.html         # HTML template
-🔧 Development
-Available Scripts
+```
 
-npm run dev - Start development server
-npm run build - Build for production
-npm run preview - Preview production build
-npm run lint - Run ESLint
-npm run lint:fix - Fix ESLint issues
-npm run type-check - Check TypeScript types
-npm test - Run tests
+## 🔧 Development
 
-Environment Variables
-VariableDescriptionRequiredGEMINI_API_KEYGoogle Gemini AI API keyYesVITE_APP_NAMEApplication nameNoVITE_API_BASE_URLAPI base URLNo
-🚀 Deployment
-Building for Production
-bashnpm run build
-The built files will be in the dist/ directory.
-Deploy to Vercel
+### Available Scripts
 
-Push your code to GitHub
-Connect your repository to Vercel
-Add your environment variables in Vercel dashboard
-Deploy!
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+- `npm run lint:fix` - Fix ESLint issues
+- `npm run type-check` - Check TypeScript types
+- `npm test` - Run tests
 
-Deploy to Netlify
+### Environment Variables
 
-Run npm run build
-Upload the dist/ folder to Netlify
-Add environment variables in Netlify dashboard
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `GEMINI_API_KEY` | Google Gemini AI API key | Yes |
+| `GROQ_API_KEY` | Groq AI API key | No |
+| `GROK_API_KEY` | Grok AI API key | No |
+| `VITE_APP_NAME` | Application name | No |
+| `VITE_API_BASE_URL` | API base URL | No |
 
-🤝 Contributing
+## 🚀 Deployment
 
-Fork the repository
-Create a feature branch: git checkout -b feature/amazing-feature
-Commit your changes: git commit -m 'Add amazing feature'
-Push to the branch: git push origin feature/amazing-feature
-Open a Pull Request
+### Building for Production
 
-📝 License
-This project is licensed under the MIT License - see the LICENSE file for details.
-🙏 Acknowledgments
+```bash
+npm run build
+```
 
-PDF.js for PDF rendering
-Google Gemini AI for AI capabilities
-KaTeX for LaTeX rendering
-Tailwind CSS for styling
-React for the UI framework
+The built files will be in the `dist/` directory.
 
-📞 Support
+### Deploy to Vercel
+
+1. Push your code to GitHub
+2. Connect your repository to [Vercel](https://vercel.com)
+3. Add your environment variables in Vercel dashboard
+4. Deploy!
+
+### Deploy to Netlify
+
+1. Run `npm run build`
+2. Upload the `dist/` folder to [Netlify](https://netlify.com)
+3. Add environment variables in Netlify dashboard
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [PDF.js](https://mozilla.github.io/pdf.js/) for PDF rendering
+- [Google Gemini AI](https://ai.google.dev/) for AI capabilities
+- [KaTeX](https://katex.org/) for LaTeX rendering
+- [Tailwind CSS](https://tailwindcss.com/) for styling
+- [React](https://react.dev/) for the UI framework
+
+## 📞 Support
+
 If you have any questions or run into issues:
 
-Check the Issues page
-Create a new issue if your problem isn't already reported
-Provide as much detail as possible including:
+1. Check the [Issues](https://github.com/yourusername/pdf-annotator-ai-tutor/issues) page
+2. Create a new issue if your problem isn't already reported
+3. Provide as much detail as possible including:
+   - Steps to reproduce
+   - Expected vs actual behavior
+   - Browser and OS information
+   - Console error messages
 
-Steps to reproduce
-Expected vs actual behavior
-Browser and OS information
-Console error messages
+---
 
-
-
-
-Happy Annotating! 🎉
-
-## 🎯 **Next Steps After Creating These Files**
-
-1. **Copy the files**: Create each file in your project root
-2. **Install dependencies**: Run `npm install` to get the new dev dependencies
-3. **Set up environment**: Add your actual Gemini API key to `.env`
-4. **Test the setup**: Run `npm run dev` to make sure everything works
-5. **Commit to git**: Initialize git repository and make your first commit
-
-These files will give you a solid foundation for development, deployment, and collaboration!
+**Happy Annotating! 🎉**
