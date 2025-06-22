@@ -1,0 +1,6 @@
+{
+  "name": "Rapid Tutor",
+  "description": "An application to upload, markup PDFs with handwritten and text notes, convert handwriting to LaTeX, and get AI-powered tutoring hints based on your work.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
