@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from 'pdfjs-dist';
-import { Annotation, Point, StrokeAnnotation, TextAnnotation, Tool, RenderedLatexAnnotation, SelectionRectangle } from '../types';
+import { Annotation, Point, StrokeAnnotation, TextAnnotation, Tool, LatexAnnotation, SelectionRectangle, RenderedLatexAnnotation } from '../src/types';
 import { DEFAULT_PEN_COLOR, DEFAULT_PEN_LINE_WIDTH, ERASER_LINE_WIDTH, DEFAULT_TEXT_COLOR, DEFAULT_TEXT_FONT_SIZE_PDF_POINTS } from '../constants';
 import katex from 'katex';
 
@@ -168,7 +168,7 @@ const PdfAnnotator = forwardRef<
             container.style.transformOrigin = 'top left';
 
             try {
-              katex.render(latexAnn.latexString, container, {
+              katex.render(latexAnn.latex, container, {
                 throwOnError: false,
                 displayMode: false, 
               });
@@ -280,6 +280,7 @@ const PdfAnnotator = forwardRef<
         y: pdfPoint.y,
         text: '',
         fontSize: DEFAULT_TEXT_FONT_SIZE_PDF_POINTS, 
+        size: DEFAULT_TEXT_FONT_SIZE_PDF_POINTS,
         color: textColor,
         editing: true,
       };
@@ -553,12 +554,15 @@ const PdfAnnotator = forwardRef<
   }));
 
   return (
-    <div className="relative shadow-lg" style={{ userSelect: (selectedTool === Tool.TEXT || drawingState.activeTextAnnotation) ? 'auto' : 'none' }}>
+    <div className="relative shadow-lg w-full" style={{ 
+      userSelect: (selectedTool === Tool.TEXT || drawingState.activeTextAnnotation) ? 'auto' : 'none',
+      minHeight: '100%'
+    }}>
       {isLoadingPage && <div className="absolute inset-0 bg-gray-500 bg-opacity-50 flex items-center justify-center z-20"><div className="text-white text-xl">Loading page...</div></div>}
-      <canvas ref={pdfCanvasRef} className="block border border-gray-500" />
+      <canvas ref={pdfCanvasRef} className="block border border-gray-500 max-w-none" />
       <canvas
         ref={annotationCanvasRef}
-        className="absolute top-0 left-0 border border-transparent z-10"
+        className="absolute top-0 left-0 border border-transparent z-10 max-w-none"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

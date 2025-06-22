@@ -1,8 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* Tailwind directives - these may show as warnings in some editors but will work correctly */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -22,3 +23,10 @@ body {
   width: 100%;
   height: 100vh;
 }
+
+/* Custom cursors */
+.eraser-cursor {
+  cursor: none; /* Hide the default cursor */
+}
+
+/* Add additional cursor styles as needed */
