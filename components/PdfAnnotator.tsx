@@ -3,7 +3,7 @@ import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, f
 import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from 'pdfjs-dist';
 import { Annotation, Point, StrokeAnnotation, TextAnnotation, Tool, RenderedLatexAnnotation, SelectionRectangle } from '../types';
 import { DEFAULT_PEN_COLOR, DEFAULT_PEN_LINE_WIDTH, ERASER_LINE_WIDTH, DEFAULT_TEXT_COLOR, DEFAULT_TEXT_FONT_SIZE_PDF_POINTS } from '../constants';
-import { InlineMath } from 'react-katex';
+import { BlockMath } from 'react-katex';
 
 // Helper to generate unique IDs
 const generateId = (): string => Math.random().toString(36).substr(2, 9);
@@ -614,7 +614,7 @@ const PdfAnnotator = forwardRef<
                 transformOrigin: 'top left',
               }}
             >
-              <InlineMath math={latexAnn.latexString} />
+              <BlockMath math={latexAnn.latexString}/>
             </div>
           );
       })}

@@ -1,4 +1,7 @@
+@import 'katex/dist/katex.min.css';
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+
 
 /* Tailwind directives - these may show as warnings in some editors but will work correctly */
 @tailwind base;
