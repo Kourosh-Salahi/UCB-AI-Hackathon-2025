@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tool } from '../types';
+import { Tool } from '../src/types';
 import { ZOOM_LEVELS } from '../constants';
 
 interface ToolbarProps {

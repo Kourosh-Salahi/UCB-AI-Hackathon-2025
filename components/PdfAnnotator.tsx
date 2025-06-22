@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from 'pdfjs-dist';
-import { Annotation, Point, StrokeAnnotation, TextAnnotation, Tool, LatexAnnotation, SelectionRectangle, RenderedLatexAnnotation } from '../src/types';
-import { DEFAULT_PEN_COLOR, DEFAULT_PEN_LINE_WIDTH, ERASER_LINE_WIDTH, DEFAULT_TEXT_COLOR, DEFAULT_TEXT_FONT_SIZE_PDF_POINTS } from '../constants';
-import katex from 'katex';
+import { Annotation, Point, StrokeAnnotation, TextAnnotation, Tool, RenderedLatexAnnotation, SelectionRectangle } from '../src/types';
+import { ERASER_LINE_WIDTH, DEFAULT_TEXT_FONT_SIZE_PDF_POINTS } from '../constants';
+import { InlineMath } from 'react-katex';
 
 // Helper to generate unique IDs
 const generateId = (): string => Math.random().toString(36).substr(2, 9);
@@ -71,7 +71,7 @@ const PdfAnnotator = forwardRef<
   const [pageViewport, setPageViewport] = useState<PageViewport | null>(null);
   const [textInput, setTextInput] = useState<{ x: number, y: number, id: string, value: string } | null>(null); // For text tool input
 
-  const getCanvasCoordinates = (event: React.MouseEvent<HTMLCanvasElement>): Point => {
+  const getCanvasCoordinates = (event: React.PointerEvent<HTMLCanvasElement>): Point => {
     const canvas = annotationCanvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
@@ -99,13 +99,6 @@ const PdfAnnotator = forwardRef<
     if (!canvas || !ctx || !pageViewport) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Clear existing KaTeX containers before redrawing
-    const parent = annotationCanvasRef.current?.parentElement;
-    if (parent) {
-        const latexContainers = parent.querySelectorAll('div[id^="latex-container-"]');
-        latexContainers.forEach(container => container.remove());
-    }
 
 
     annotations.forEach(annotation => {
@@ -143,40 +136,7 @@ const PdfAnnotator = forwardRef<
           break;
         }
         case 'latex': {
-          const latexAnn = annotation as RenderedLatexAnnotation;
-          const containerId = `latex-container-${latexAnn.id}`; // Unique ID for container
-          let container = document.getElementById(containerId);
-          // Create container if it doesn't exist
-          if (!container && annotationCanvasRef.current?.parentElement) {
-            container = document.createElement('div');
-            container.id = containerId;
-            container.style.position = 'absolute';
-            container.style.pointerEvents = 'none'; // So it doesn't interfere with canvas events
-            container.style.zIndex = '15'; // Ensure it's above canvas but below text input
-            annotationCanvasRef.current.parentElement.appendChild(container);
-          }
-          
-          if (container) { // Ensure container exists before styling and rendering
-            const canvasPoint = getCanvasCoordinatesFromPdf({x: latexAnn.x, y: latexAnn.y});
-            const canvasRect = annotationCanvasRef.current?.getBoundingClientRect();
-
-            container.style.left = `${(canvasRect?.left || 0) + canvasPoint.x}px`;
-            container.style.top = `${(canvasRect?.top || 0) + canvasPoint.y}px`;
-            container.style.color = latexAnn.color;
-            
-            container.style.transform = `scale(${zoomLevel})`;
-            container.style.transformOrigin = 'top left';
-
-            try {
-              katex.render(latexAnn.latex, container, {
-                throwOnError: false,
-                displayMode: false, 
-              });
-            } catch (e) {
-              console.error("KaTeX rendering error:", e);
-              container.innerText = "Error rendering LaTeX";
-            }
-          }
+          // LaTeX rendering is handled by the React components rather than in canvas
           break;
         }
       }
@@ -251,7 +211,7 @@ const PdfAnnotator = forwardRef<
   const [isLoadingPage, setIsLoadingPage] = useState(false);
 
 
-  const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvasPoint = getCanvasCoordinates(event);
     const pdfPoint = getPdfPageCoordinates(canvasPoint);
 
@@ -266,11 +226,12 @@ const PdfAnnotator = forwardRef<
         handleTextSubmit();
       }
       const newTextId = generateId();
-      // Position textarea relative to canvas parent for correct scroll behavior
-      const canvasWrapper = annotationCanvasRef.current?.parentElement;
-      const parentRect = canvasWrapper?.getBoundingClientRect();
-      const inputX = canvasPoint.x + (annotationCanvasRef.current?.offsetLeft || 0) - (parentRect?.left || 0);
-      const inputY = canvasPoint.y + (annotationCanvasRef.current?.offsetTop || 0) - (parentRect?.top || 0);
+      
+      // canvasPoint.x and canvasPoint.y are already relative to the annotationCanvas.
+      // Since annotationCanvas is at (0,0) of its relative parent,
+      // canvasPoint.x and canvasPoint.y are the correct offsets for the textarea.
+      const inputX = canvasPoint.x;
+      const inputY = canvasPoint.y;
 
       setTextInput({ x: inputX, y: inputY, id: newTextId, value: '' });
       const tempTextAnn: TextAnnotation = {
@@ -336,7 +297,7 @@ const PdfAnnotator = forwardRef<
     }
   };
 
-  const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (!drawingState.isDrawing && !drawingState.isSelecting && !drawingState.isMoving) return;
     const canvasPoint = getCanvasCoordinates(event);
 
@@ -403,7 +364,7 @@ const PdfAnnotator = forwardRef<
     }
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = () => {
     if (drawingState.isDrawing && selectedTool === Tool.PEN) {
       if (drawingState.currentPoints.length > 1 && pageViewport) {
         const newStroke: StrokeAnnotation = {
@@ -450,9 +411,9 @@ const PdfAnnotator = forwardRef<
     }));
   };
 
-  const handleMouseLeave = () => { 
+  const handlePointerLeave = () => { 
     if (drawingState.isDrawing || drawingState.isSelecting || drawingState.isMoving) {
-        handleMouseUp();
+        handlePointerUp();
     }
   };
 
@@ -536,43 +497,94 @@ const PdfAnnotator = forwardRef<
         const tempCtx = tempCanvas.getContext('2d');
         if (!tempCtx) return null;
 
-        // Draw the selected portion of the PDF canvas (background)
-        tempCtx.drawImage(
-            pdfCanvas,
-            finalCanvasX, finalCanvasY, widthCanvas, heightCanvas, 
-            0, 0, widthCanvas, heightCanvas 
-        );
-        // Draw the selected portion of the annotation canvas (foreground)
-        tempCtx.drawImage(
-            annCanvas,
-            finalCanvasX, finalCanvasY, widthCanvas, heightCanvas,
-            0, 0, widthCanvas, heightCanvas
-        );
-        
-        return tempCanvas.toDataURL('image/png');
+        try {
+            // Draw the selected portion of the PDF canvas (background)
+            tempCtx.drawImage(
+                pdfCanvas,
+                finalCanvasX, finalCanvasY, widthCanvas, heightCanvas, 
+                0, 0, widthCanvas, heightCanvas 
+            );
+            // Draw the selected portion of the annotation canvas (foreground)
+            tempCtx.drawImage(
+                annCanvas,
+                finalCanvasX, finalCanvasY, widthCanvas, heightCanvas,
+                0, 0, widthCanvas, heightCanvas
+            );
+            
+            // Make sure the image is not too large (downscale very large selections)
+            if (widthCanvas > 1200 || heightCanvas > 1200) {
+                const maxDimension = 1200;
+                const scale = Math.min(maxDimension / widthCanvas, maxDimension / heightCanvas);
+                
+                const scaledCanvas = document.createElement('canvas');
+                scaledCanvas.width = widthCanvas * scale;
+                scaledCanvas.height = heightCanvas * scale;
+                const scaledCtx = scaledCanvas.getContext('2d');
+                
+                if (scaledCtx) {
+                    scaledCtx.drawImage(tempCanvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+                    return scaledCanvas.toDataURL('image/png');
+                }
+            }
+            
+            return tempCanvas.toDataURL('image/png');
+        } catch (err) {
+            console.error('Error capturing image:', err);
+            return null;
+        }
     }
   }));
 
   return (
-    <div className="relative shadow-lg w-full" style={{ 
-      userSelect: (selectedTool === Tool.TEXT || drawingState.activeTextAnnotation) ? 'auto' : 'none',
-      minHeight: '100%'
+    <div className="relative shadow-lg" style={{ 
+      userSelect: (selectedTool === Tool.TEXT || drawingState.activeTextAnnotation) ? 'auto' : 'none'
     }}>
       {isLoadingPage && <div className="absolute inset-0 bg-gray-500 bg-opacity-50 flex items-center justify-center z-20"><div className="text-white text-xl">Loading page...</div></div>}
-      <canvas ref={pdfCanvasRef} className="block border border-gray-500 max-w-none" />
+      <canvas ref={pdfCanvasRef} className="block border border-gray-500" />
       <canvas
         ref={annotationCanvasRef}
-        className="absolute top-0 left-0 border border-transparent z-10 max-w-none"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
-        style={{ cursor: selectedTool === Tool.PEN ? 'crosshair' : 
-                         selectedTool === Tool.ERASER ? 'grab' : 
-                         selectedTool === Tool.TEXT ? 'text' :
-                         selectedTool === Tool.LATEX_SELECT ? 'copy' :
-                         selectedTool === Tool.SELECT ? 'move' : 'default' }}
+        className="absolute top-0 left-0 border border-transparent z-10"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerLeave}
+        style={{ 
+          cursor: selectedTool === Tool.PEN ? 'crosshair' : 
+                  selectedTool === Tool.ERASER ? 'grab' : 
+                  selectedTool === Tool.TEXT ? 'text' :
+                  selectedTool === Tool.LATEX_SELECT ? 'copy' :
+                  selectedTool === Tool.SELECT ? 'move' : 'default',
+          touchAction: 'none'
+        }}
       />
+      {/* Render LaTeX annotations using react-katex */}
+      {pageViewport && annotations
+        .filter(ann => ann.type === 'latex')
+        .map(ann => {
+          const latexAnn = ann as RenderedLatexAnnotation;
+          // Calculate canvas coordinates for the top-left of the LaTeX annotation
+          const canvasPoint = getCanvasCoordinatesFromPdf({ x: latexAnn.x, y: latexAnn.y });
+          
+          return (
+            <div
+              key={latexAnn.id}
+              id={`latex-container-${latexAnn.id}`}
+              style={{
+                position: 'absolute',
+                pointerEvents: 'none', // Allow clicks to pass through to the canvas
+                zIndex: 15, // Above canvas, below active text input
+                left: `${canvasPoint.x}px`, // Position relative to the parent
+                top: `${canvasPoint.y}px`,
+                color: latexAnn.color,
+                transform: `scale(${zoomLevel})`,
+                transformOrigin: 'top left',
+              }}
+            >
+              <InlineMath math={latexAnn.latexString || latexAnn.latex} />
+            </div>
+          );
+        })
+      }
       {textInput && pageViewport && (
         <textarea
           autoFocus

@@ -1,15 +1,18 @@
 import React from 'react';
 
 interface ModalProps {
+  isOpen: boolean;
   title: string;
   onClose: () => void;
   children: React.ReactNode;
 }
 
-const Modal: React.FC<ModalProps> = ({ title, onClose, children }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, title, onClose, children }) => {
+  if (!isOpen) return null;
+  
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-40 p-4 print:hidden">
-      <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+    <div className="fixed inset-0 bg-gray-800 bg-opacity-40 flex items-center justify-center z-40 p-4 print:hidden">
+      <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col text-white">
         <div className="flex justify-between items-center p-4 border-b border-gray-700">
           <h2 className="text-xl font-semibold text-white">{title}</h2>
           <button
@@ -22,7 +25,7 @@ const Modal: React.FC<ModalProps> = ({ title, onClose, children }) => {
             </svg>
           </button>
         </div>
-        <div className="p-1 overflow-y-auto">
+        <div className="p-1 overflow-y-auto text-white">
           {children}
         </div>
          <div className="p-4 border-t border-gray-700 text-right">

@@ -46,7 +46,13 @@ export interface LatexAnnotation {
   x: number;
   y: number;
   latex: string;
+  latexString?: string;  // For use with react-katex
   color: string;
+}
+
+// Interface for latex annotations that have been processed for rendering with react-katex
+export interface RenderedLatexAnnotation extends LatexAnnotation {
+  latexString: string;  // non-optional for rendered annotations
 }
 
 export interface RenderedLatexAnnotation extends LatexAnnotation {
