@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Markup & AI Tutor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Removed integrity attribute -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    /* For KaTeX font rendering */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    .katex { font-size: 1.1em; } /* Adjust KaTeX size if needed */
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "pdfjs-dist": "https://esm.sh/pdfjs-dist@3.11.174",
+    "katex": "https://esm.sh/katex@^0.16.22",
+    "@google/genai": "https://esm.sh/@google/genai@^1.6.0"
+  }
+}
+</script>
+  <!-- Removed link to index.css as it's not provided and causes MIME type errors -->
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-gray-100">
+  <div id="root"></div>
+  <!-- When using Vite, Vite injects the script tag. 
+       If running with simple static server (which has issues with TSX), it's needed.
+       Vite will handle this path correctly. -->
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
